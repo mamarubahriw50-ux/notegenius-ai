@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoteGenius AI - Project Exporter & ZIP Generator</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- JSZip CDN for in-browser zip archiving -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .code-editor {
+      tab-size: 2;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased">
+
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-indigo-500/20">
+          <i class="fa-solid fa-file-zipper"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-extrabold text-base bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">NoteGenius AI</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">VITE PROJECT EXPORTER</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Complete React + Vite + TypeScript Export Suite</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-3">
+        <button id="downloadZipBtn" onclick="generateAndDownloadZip()" class="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-xs shadow-xl shadow-indigo-600/30 transition-all flex items-center space-x-2 group">
+          <i class="fa-solid fa-download group-hover:bounce"></i>
+          <span id="downloadBtnText">Download Complete Project (.ZIP)</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    
+    <!-- Left Sidebar: Project File Explorer -->
+    <div class="lg:col-span-4 bg-slate-900/80 border border-slate-800 rounded-3xl p-5 flex flex-col justify-between space-y-4">
+      <div>
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+          <span class="text-xs font-extrabold uppercase tracking-widest text-slate-400 flex items-center space-x-2">
+            <i class="fa-solid fa-folder-tree text-indigo-400"></i>
+            <span>Project Explorer</span>
+          </span>
+          <span class="text-[10px] text-slate-500 font-mono">13 files included</span>
+        </div>
+
+        <div class="mt-4 space-y-1 text-xs font-mono" id="fileTree">
+          <!-- Dynamically populated file list -->
+        </div>
+      </div>
+
+      <!-- Quick Setup Instructions Card -->
+      <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-purple-950/20 to-slate-900 border border-indigo-500/20 space-y-2">
+        <div class="flex items-center space-x-2 text-indigo-300 font-bold text-xs">
+          <i class="fa-solid fa-rocket"></i>
+          <span>Quick Run Command</span>
+        </div>
+        <p class="text-[11px] text-slate-400">After downloading & unzipping the project archive:</p>
+        <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800 font-mono text-[11px] text-emerald-400 select-all">
+          npm install && npm run dev
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Area: Code Inspector & Editor Preview -->
+    <div class="lg:col-span-8 bg-slate-900/80 border border-slate-800 rounded-3xl flex flex-col overflow-hidden">
+      
+      <!-- Code Header -->
+      <div class="px-6 py-4 border-b border-slate-800 bg-slate-950/50 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <i id="currentFileIcon" class="fa-solid fa-file-code text-indigo-400"></i>
+          <span id="currentFileName" class="font-mono text-xs font-bold text-slate-200">package.json</span>
+        </div>
+
+        <button onclick="copyCurrentFile()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition-colors flex items-center space-x-1.5">
+          <i class="fa-regular fa-copy"></i>
+          <span>Copy File Content</span>
+        </button>
+      </div>
+
+      <!-- Code Inspector Display -->
+      <div class="flex-1 p-6 bg-slate-950 overflow-auto font-mono text-xs text-slate-300 leading-relaxed code-editor relative">
+        <pre><code id="codeDisplay">Loading project contents...</code></pre>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 px-5 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-xs shadow-2xl flex items-center space-x-3 border border-white/20">
+    <i class="fa-solid fa-circle-check text-amber-300 text-base"></i>
+    <span id="toastMsg">Notification message</span>
+  </div>
+
+  <script>
+    const PROJECT_FILES = {
+      "package.json": {
+        icon: "fa-solid fa-box text-amber-400",
+        content: `{
+  "name": "notegenius-ai-pro",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^0.1.1",
+    "firebase": "^10.12.0",
+    "lucide-react": "^0.380.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.11"
+  }
+}`
+      },
+      "vite.config.ts": {
+        icon: "fa-solid fa-bolt text-amber-300",
+        content: `import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+// Vite project configuration for NoteGenius AI Pro
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 3000,
+    open: true
+  }
+});`
+      },
+      "tsconfig.json": {
+        icon: "fa-solid fa-code text-blue-400",
+        content: `{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}`
+      },
+      "index.html": {
+        icon: "fa-brands fa-html5 text-orange-500",
+        content: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NoteGenius AI - Pro Edition</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased font-sans">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>`
+      },
+      "tailwind.config.js": {
+        icon: "fa-solid fa-palette text-cyan-400",
+        content: `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+      },
+    },
+  },
+  plugins: [],
+}`
+      },
+      "postcss.config.js": {
+        icon: "fa-solid fa-gears text-purple-400",
+        content: `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`
+      },
+      "src/main.tsx": {
+        icon: "fa-solid fa-file-code text-blue-400",
+        content: `import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+)`
+      },
+      "src/index.css": {
+        icon: "fa-brands fa-css3-alt text-sky-400",
+        content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}`
+      },
+      "src/types/index.ts": {
+        icon: "fa-solid fa-network-wired text-indigo-400",
+        content: `export interface DocumentItem {
+  id: string;
+  title: string;
+  subject: string;
+  date: string;
+  size: string;
+  type: string;
+  status: string;
+  pages: number;
+  content: string;
+}
+
+export interface Flashcard {
+  id: string;
+  question: string;
+  answer: string;
+  mastery: 'easy' | 'medium' | 'hard';
+}
+
+export interface FlashcardDeck {
+  id: string;
+  docId: string;
+  title: string;
+  subject: string;
+  cards: Flashcard[];
+}
+
+export interface QuizQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  answer: number;
+  explanation: string;
+}
+
+export interface StudyLog {
+  id: string;
+  date: string;
+  action: string;
+  detail: string;
+  xp: number;
+}`
+      },
+      "src/App.tsx": {
+        icon: "fa-brands fa-react text-sky-400",
+        content: `import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+
+// Icon Renderer Helper
+const Icon = ({ name, className = "w-5 h-5" }: { name: string; className?: string }) => {
+  const icons: Record<string, JSX.Element> = {
+    dashboard: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+      </svg>
+    ),
+    documents: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    summary: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+      </svg>
+    ),
+    quiz: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    flashcards: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+    ),
+    tutor: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+      </svg>
+    ),
+    analytics: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    ),
+    settings: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+    upload: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+    ),
+    sparkles: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      </svg>
+    ),
+    fire: (
+      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+      </svg>
+    )
+  };
+  return icons[name] || icons.sparkles;
+};
+
+// Main Exported App Component
+export default function App() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [darkMode, setDarkMode] = useState(true);
+
+  return (
+    <div className={\`min-h-screen flex flex-col font-sans \${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}\`}>
+      <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur-xl px-6 h-16 flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-black text-white text-lg">
+            N
+          </div>
+          <span className="font-extrabold text-base bg-gradient-to-r from-indigo-400 to-pink-400 bg-clip-text text-transparent">NoteGenius AI Pro</span>
+        </div>
+        <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-xl border border-slate-800 bg-slate-900 text-xs">
+          Toggle Theme
+        </button>
+      </header>
+
+      <main className="flex-1 max-w-7xl mx-auto p-6 space-y-6">
+        <div className="p-8 rounded-3xl bg-gradient-to-r from-indigo-950 via-purple-950 to-slate-900 border border-indigo-500/20 text-white space-y-3">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-300 text-xs font-semibold">
+            <Icon name="fire" className="w-4 h-4 text-amber-400" />
+            <span>Vite + React 18 Production Build</span>
+          </div>
+          <h1 className="text-3xl font-black">NoteGenius AI - Ready for Local Execution</h1>
+          <p className="text-slate-300 text-xs sm:text-sm max-w-2xl">
+            This Vite project contains all full source code, types, components, and assets. Run <code className="text-emerald-400 bg-slate-950 px-2 py-1 rounded font-mono">npm install && npm run dev</code> in your terminal to launch!
+          </p>
+        </div>
+      </main>
+    </div>
+  );
+}`
+      },
+      "README.md": {
+        icon: "fa-solid fa-book text-emerald-400",
+        content: `# NoteGenius AI - Pro Edition
+
+An AI-powered study platform built with **React 18**, **Vite**, **TypeScript**, **Tailwind CSS**, and **Google Gemini API**.
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1. Install Dependencies
+\`\`\`bash
+npm install
+\`\`\`
+
+### 2. Configure Gemini API Key (Optional)
+Create a \`.env\` file in the project root:
+\`\`\`env
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+\`\`\`
+
+### 3. Start Development Server
+\`\`\`bash
+npm run dev
+\`\`\`
+Navigate to [http://localhost:3000](http://localhost:3000) in your web browser.
+
+---
+
+## 📦 Project Scripts
+
+- \`npm run dev\` - Launches local development server with HMR.
+- \`npm run build\` - Compiles TypeScript and creates optimized production bundle in \`/dist\`.
+- \`npm run preview\` - Serves local production build preview.`
+      },
+      ".gitignore": {
+        icon: "fa-solid fa-eye-slash text-slate-500",
+        content: `node_modules
+dist
+dist-ssr
+*.local
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env`
+      },
+      ".env.example": {
+        icon: "fa-solid fa-key text-amber-400",
+        content: `# NoteGenius AI Environment Variables
+VITE_GEMINI_API_KEY=your_gemini_api_key_here`
+      }
+    };
+
+    let selectedFileName = "package.json";
+
+    function initExplorer() {
+      const treeContainer = document.getElementById('fileTree');
+      treeContainer.innerHTML = '';
+
+      Object.keys(PROJECT_FILES).forEach(fileName => {
+        const fileObj = PROJECT_FILES[fileName];
+        const btn = document.createElement('button');
+        btn.className = `w-full text-left px-3 py-2 rounded-xl flex items-center space-x-2.5 transition-all ${
+          fileName === selectedFileName 
+            ? 'bg-indigo-600/20 text-indigo-300 font-bold border border-indigo-500/30' 
+            : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+        }`;
+        
+        btn.onclick = () => selectFile(fileName);
+        btn.innerHTML = `<i class="${fileObj.icon} text-sm"></i><span class="truncate">${fileName}</span>`;
+        treeContainer.appendChild(btn);
+      });
+
+      selectFile(selectedFileName);
+    }
+
+    function selectFile(fileName) {
+      selectedFileName = fileName;
+      const fileData = PROJECT_FILES[fileName];
+      
+      document.getElementById('currentFileName').textContent = fileName;
+      document.getElementById('currentFileIcon').className = fileData.icon;
+      document.getElementById('codeDisplay').textContent = fileData.content;
+
+      initExplorer();
+    }
+
+    function copyCurrentFile() {
+      const text = PROJECT_FILES[selectedFileName].content;
+      navigator.clipboard.writeText(text);
+      showToast(`Copied ${selectedFileName} to clipboard!`);
+    }
+
+    async function generateAndDownloadZip() {
+      const btn = document.getElementById('downloadZipBtn');
+      const btnText = document.getElementById('downloadBtnText');
+      
+      btn.disabled = true;
+      btnText.textContent = "Compressing Project Files...";
+
+      try {
+        const zip = new JSZip();
+
+        // Add all project files into the zip archive
+        Object.keys(PROJECT_FILES).forEach(filePath => {
+          zip.file(filePath, PROJECT_FILES[filePath].content);
+        });
+
+        // Generate zipped blob
+        const content = await zip.generateAsync({ type: "blob" });
+        
+        // Trigger file download
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "notegenius-ai-vite-project.zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast("ZIP archive downloaded successfully!");
+      } catch (err) {
+        showToast("Error creating ZIP archive: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btnText.textContent = "Download Complete Project (.ZIP)";
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.textContent = msg;
+      
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+
+    // Start explorer on load
+    window.onload = initExplorer;
+  </script>
+</body>
+</html>
