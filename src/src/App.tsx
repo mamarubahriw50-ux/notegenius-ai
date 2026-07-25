@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const Icon = ({ name, className = "w-5 h-5" }: { name: string; className?: string }) => {
   const icons: Record<string, JSX.Element> = {
